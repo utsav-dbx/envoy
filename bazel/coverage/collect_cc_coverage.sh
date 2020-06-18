@@ -70,13 +70,13 @@ function init_gcov() {
 function llvm_coverage() {
   local output_file="${1}"; shift
   export LLVM_PROFILE_FILE="${COVERAGE_DIR}/%h-%p-%m.profraw"
-  "${COVERAGE_GCOV_PATH}" merge -output "${output_file}.data" \
+  "${COVERAGE_GCOV_PATH}" merge -sparse -output "${output_file}.data" \
       "${COVERAGE_DIR}"/*.profraw
 
 
   local object_files="$(find -L "${RUNFILES_DIR}" -type f -exec file -L {} \; \
        | grep ELF | grep -v "LSB core" | sed 's,:.*,,')"
-  
+
   local object_param=""
   for object_file in ${object_files}; do
     object_param+=" -object ${object_file}"
