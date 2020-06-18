@@ -15,6 +15,9 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer(Http::Headers::get().Referer);
+
 HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
@@ -86,8 +89,8 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   if (request_headers.UserAgent() != nullptr) {
     request_properties->set_user_agent(std::string(request_headers.getUserAgentValue()));
   }
-  if (request_headers.Referer() != nullptr) {
-    request_properties->set_referer(std::string(request_headers.getRefererValue()));
+  if (request_headers.getInline(referer.handle()) != nullptr) {
+    request_properties->set_referer(std::string(request_headers.getInlineValue(referer.handle())));
   }
   if (request_headers.ForwardedFor() != nullptr) {
     request_properties->set_forwarded_for(std::string(request_headers.getForwardedForValue()));

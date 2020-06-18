@@ -29,8 +29,9 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
     header_map.setReferenceContentType(headers.ContentTypeValues.TextUtf8);
   }
   // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
-  if (header_map.CacheControl() == nullptr) {
-    header_map.setReferenceCacheControl(headers.CacheControlValues.NoCacheMaxAge0);
+  if (header_map.get(Http::Headers::get().CacheControl) == nullptr) {
+    header_map.setReference(Http::Headers::get().CacheControl, 
+    headers.CacheControlValues.NoCacheMaxAge0);
   }
 
   // Under no circumstance should browsers sniff content-type.

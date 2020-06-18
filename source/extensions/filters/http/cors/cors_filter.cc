@@ -16,6 +16,8 @@ namespace Cors {
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_method(Http::Headers::get().AccessControlRequestMethod);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    origin(Http::Headers::get().Origin);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     access_control_allow_origin(Http::Headers::get().AccessControlAllowOrigin);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
@@ -52,7 +54,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  origin_ = headers.Origin();
+  origin_ = headers.getInline(origin.handle());
   if (origin_ == nullptr || origin_->value().empty()) {
     return Http::FilterHeadersStatus::Continue;
   }

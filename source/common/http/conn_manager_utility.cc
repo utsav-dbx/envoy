@@ -186,7 +186,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
-    request_headers.removeEnvoyIpTags();
+    // fixfixrequest_headers.removeEnvoyIpTags();
     request_headers.removeEnvoyOriginalUrl();
     request_headers.removeEnvoyHedgeOnPerTryTimeout();
 

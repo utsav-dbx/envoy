@@ -9,6 +9,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    cache_control(Http::Headers::get().CacheControl);
+
 struct CacheResponseCodeDetailValues {
   const absl::string_view ResponseFromCacheFilter = "cache.response_from_cache_filter";
 };
@@ -28,7 +31,7 @@ bool CacheFilter::isCacheableRequest(Http::RequestHeaderMap& headers) {
 }
 
 bool CacheFilter::isCacheableResponse(Http::ResponseHeaderMap& headers) {
-  const absl::string_view cache_control = headers.getCacheControlValue();
+  const absl::string_view cache_control = headers.getInline(cache_control.handle());
   // TODO(toddmgreer): fully check for cacheability. See for example
   // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
   return !StringUtil::caseFindToken(cache_control, ",",

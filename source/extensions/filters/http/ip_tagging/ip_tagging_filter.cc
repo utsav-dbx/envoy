@@ -13,6 +13,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    envoy_ip_tags(Http::Headers::get().EnvoyIpTags);
+
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
@@ -82,7 +85,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");
-    headers.appendEnvoyIpTags(tags_join, ",");
+    headers.appendLine(envoy_ip_tags.handle(), tags_join, ",");
 
     // We must clear the route cache or else we can't match on x-envoy-ip-tags.
     callbacks_->clearRouteCache();

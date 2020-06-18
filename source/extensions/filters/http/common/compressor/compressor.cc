@@ -11,6 +11,17 @@ namespace Compressors {
 
 namespace {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    accept_encoding(Http::Headers::get().AcceptEncoding);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    cache_control(Http::Headers::get().CacheControl);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    content_encoding(Http::Headers::get().ContentEncoding);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    etag(Http::Headers::get().Etag);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    vary(Http::Headers::get().Vary);
+
 // Default minimum length of an upstream response that allows compression.
 const uint64_t DefaultMinimumContentLength = 30;
 
@@ -61,15 +72,16 @@ CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
     : skip_compression_{true}, config_(std::move(config)) {}
 
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
-  if (accept_encoding != nullptr) {
+  const Http::HeaderEntry* accept_encoding_header = headers.getInline(accept_encoding.handle());
+  if (accept_encoding_header != nullptr) {
     // Capture the value of the "Accept-Encoding" request header to use it later when making
     // decision on compressing the corresponding HTTP response.
-    accept_encoding_ = std::make_unique<std::string>(accept_encoding->value().getStringView());
+    accept_encoding_ =
+        std::make_unique<std::string>(accept_encoding_header->value().getStringView());
   }
 
   if (config_->enabled() && config_->removeAcceptEncodingHeader()) {
-    headers.removeAcceptEncoding();
+    headers.removeInline(accept_encoding.handle());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -103,12 +115,12 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   if (!end_stream && config_->enabled() && isMinimumContentLength(headers) &&
       isAcceptEncodingAllowed(headers) && isContentTypeAllowed(headers) &&
       !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
-      isTransferEncodingAllowed(headers) && !headers.ContentEncoding()) {
+      isTransferEncodingAllowed(headers) && !headers.getInline(content_encoding.handle())) {
     skip_compression_ = false;
     sanitizeEtagHeader(headers);
     insertVaryHeader(headers);
     headers.removeContentLength();
-    headers.setContentEncoding(config_->contentEncoding());
+    headers.setInline(content_encoding.handle(), config_->contentEncoding());
     config_->stats().compressed_.inc();
     // Finally instantiate the compressor.
     compressor_ = config_->makeCompressor();
@@ -139,9 +151,9 @@ Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTraile
 }
 
 bool CompressorFilter::hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const {
-  const Http::HeaderEntry* cache_control = headers.CacheControl();
-  if (cache_control) {
-    return StringUtil::caseFindToken(cache_control->value().getStringView(), ",",
+  const Http::HeaderEntry* cache_control_header = headers.getInline(cache_control.handle());
+  if (cache_control_header) {
+    return StringUtil::caseFindToken(cache_control_header->value().getStringView(), ",",
                                      Http::Headers::get().CacheControlValues.NoTransform);
   }
 
@@ -402,10 +414,10 @@ void CompressorFilter::insertVaryHeader(Http::ResponseHeaderMap& headers) {
       std::string new_header;
       absl::StrAppend(&new_header, vary->value().getStringView(), ", ",
                       Http::Headers::get().VaryValues.AcceptEncoding);
-      headers.setVary(new_header);
+      headers.setInline(vary.handle(), new_header);
     }
   } else {
-    headers.setReferenceVary(Http::Headers::get().VaryValues.AcceptEncoding);
+    headers.setReferenceInline(vary.handle(), Http::Headers::get().VaryValues.AcceptEncoding);
   }
 }
 
@@ -415,11 +427,11 @@ void CompressorFilter::insertVaryHeader(Http::ResponseHeaderMap& headers) {
 // This design attempts to stay more on the safe side by preserving weak etags and removing
 // the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
 void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
-  const Http::HeaderEntry* etag = headers.Etag();
-  if (etag != nullptr) {
-    absl::string_view value(etag->value().getStringView());
+  const Http::HeaderEntry* etag_header = headers.getInline(etag.handle());
+  if (etag_header != nullptr) {
+    absl::string_view value(etag_header->value().getStringView());
     if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
-      headers.removeEtag();
+      headers.removeInline(etag.handle());
     }
   }
 }
