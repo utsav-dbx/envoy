@@ -799,7 +799,7 @@ private:
   const bool local_cluster_;
   Stats::SymbolTable& symbol_table_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
-  mutable Stats::ScopeSharedPtr load_report_router_stats_scope_;
+  Stats::ScopeSharedPtr load_report_router_stats_scope_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
