@@ -25,7 +25,7 @@ Stats::ScopePtr generateStatsScope(const envoy::config::cluster::v3::Cluster& co
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-    Stats::Store& stats, absl::optional<Stats::Store>& load_report_stats_store,
+    Stats::Store& stats, Stats::StoreOptRef load_report_stats_store,
     ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,

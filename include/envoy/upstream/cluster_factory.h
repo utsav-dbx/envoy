@@ -106,7 +106,7 @@ public:
   /**
    * @return the server-wide load report stats store.
    */
-  virtual absl::optional<Stats::Store>& loadReportStatsStore() PURE;
+  virtual Stats::StoreOptRef& loadReportStatsStore() PURE;
 
   /**
    * @return the server's TLS slot allocator.

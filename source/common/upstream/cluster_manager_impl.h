@@ -40,7 +40,7 @@ namespace Upstream {
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(
-      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats, absl::optional<Stats::Store>& load_report_service_store,
+      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats, Stats::StoreOptRef load_report_service_store,
       ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
       Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
@@ -82,7 +82,7 @@ protected:
   Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
-  absl::optional<Stats::Store>& load_report_service_store_;
+  Stats::StoreOptRef load_report_service_store_;
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
   Network::DnsResolverSharedPtr dns_resolver_;

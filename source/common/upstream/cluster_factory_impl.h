@@ -52,7 +52,7 @@ class ClusterFactoryContextImpl : public ClusterFactoryContext {
 
 public:
   ClusterFactoryContextImpl(ClusterManager& cluster_manager, Stats::Store& stats,
-                            absl::optional<Stats::Store>& load_report_stats_store,
+                            Stats::StoreOptRef load_report_stats_store,
                             ThreadLocal::SlotAllocator& tls,
                             Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
@@ -72,7 +72,7 @@ public:
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
-  absl::optional<Stats::Store>& loadReportStatsStore() override { return load_report_stats_store_; }
+  Stats::StoreOptRef& loadReportStatsStore() override { return load_report_stats_store_; }
   ThreadLocal::SlotAllocator& tls() override { return tls_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
@@ -93,7 +93,7 @@ public:
 private:
   ClusterManager& cluster_manager_;
   Stats::Store& stats_;
-  absl::optional<Stats::Store&> load_report_stats_store_;
+  Stats::StoreOptRef load_report_stats_store_;
   ThreadLocal::SlotAllocator& tls_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
@@ -122,7 +122,7 @@ public:
    */
   static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   create(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-         Stats::Store& stats, absl::optional<Stats::Store>& load_report_stats_store, ThreadLocal::Instance& tls,
+         Stats::Store& stats, Stats::StoreOptRef load_report_stats_store, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
          Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
