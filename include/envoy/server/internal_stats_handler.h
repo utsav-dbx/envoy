@@ -1,21 +1,21 @@
 #pragma once
-#include <map>
-#include <set>
 
+#include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
 namespace Envoy {
 namespace Server {
 
-using PostReceiveCb =
-    std::function<void(std::multimap<std::string, const Stats::HistogramStatistics&> stats)>;
+using PostMergeSnapshotCb = std::function<void(Envoy::Stats::MetricSnapshotPtr)>;
 
 class InternalStatsHandler {
 
 public:
   explicit InternalStatsHandler(Stats::StoreRoot& root) : store_root_(root) {}
-  void receiveGlobalStats(std::set<std::string>& stat_names, PostReceiveCb cb) const;
+
+  // Merges histograms and calls PostMergeSnapshotCb with a snapshot
+  void snapshot(PostMergeSnapshotCb);
 
 private:
   Stats::StoreRoot& store_root_;

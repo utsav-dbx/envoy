@@ -55,6 +55,8 @@ private:
   void handleFailure();
   void startLoadReportPeriod();
 
+  void _sendLoadStatsRequest();
+
   ClusterManager& cm_;
   LoadReporterStats stats_;
   Grpc::AsyncClient<envoy::service::load_stats::v3::LoadStatsRequest,

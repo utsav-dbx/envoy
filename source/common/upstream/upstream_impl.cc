@@ -677,6 +677,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.common_http_protocol_options(), max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
+      load_report_router_stats_(absl::nullopt),
       connect_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
       per_connection_buffer_limit_bytes_(
@@ -684,7 +685,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      load_report_router_stats_(generateLoadReportRouterStats(*stats_scope_)),
       timeout_budget_stats_(config.track_timeout_budgets()
                                 ? absl::make_optional<ClusterTimeoutBudgetStats>(
                                       generateTimeoutBudgetStats(*stats_scope_))
@@ -1054,6 +1054,16 @@ void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   }
 
   reloadHealthyHostsHelper(host);
+}
+
+void ClusterImplBase::setLoadReportStatsScope(const Stats::ScopeSharedPtr& scope) {
+  if (!scope) {
+    info_->loadReportRouterStats() = absl::nullopt;
+    load_report_router_stats_scope_ = nullptr;
+    return;
+  }
+  load_report_router_stats_scope_ = scope;
+  info_->loadReportRouterStats().emplace(ClusterInfoImpl::generateLoadReportRouterStats(*scope));
 }
 
 void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {

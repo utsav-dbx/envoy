@@ -206,7 +206,7 @@ public:
    */
   InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-               HotRestart& restarter, Stats::StoreRoot& store,
+               HotRestart& restarter, Stats::StoreRoot& store, absl::optional<Stats::StoreRoot>& load_reporting_service_store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
@@ -316,6 +316,7 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
+  absl::optional<Stats::StoreRoot>& load_reporting_service_store_;
   std::unique_ptr<ServerStats> server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
@@ -368,40 +369,6 @@ private:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
-};
-
-// Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could
-// potentially have a single class instance held in a static and have a clear() method to avoid some
-// vector constructions and reservations, but I'm not sure it's worth the extra complexity until it
-// shows up in perf traces.
-// TODO(mattklein123): One thing we probably want to do is switch from returning vectors of metrics
-//                     to a lambda based callback iteration API. This would require less vector
-//                     copying and probably be a cleaner API in general.
-class MetricSnapshotImpl : public Stats::MetricSnapshot {
-public:
-  explicit MetricSnapshotImpl(Stats::Store& store);
-
-  // Stats::MetricSnapshot
-  const std::vector<CounterSnapshot>& counters() override { return counters_; }
-  const std::vector<std::reference_wrapper<const Stats::Gauge>>& gauges() override {
-    return gauges_;
-  };
-  const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
-    return histograms_;
-  }
-  const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
-    return text_readouts_;
-  }
-
-private:
-  std::vector<Stats::CounterSharedPtr> snapped_counters_;
-  std::vector<CounterSnapshot> counters_;
-  std::vector<Stats::GaugeSharedPtr> snapped_gauges_;
-  std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
-  std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
-  std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
-  std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
-  std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
 };
 
 } // namespace Server

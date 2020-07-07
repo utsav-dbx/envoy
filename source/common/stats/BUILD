@@ -71,6 +71,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metric_snapshot_impl_lib",
+    srcs = ["metric_snapshot_impl.cc"],
+    hdrs = ["metric_snapshot_impl.h"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "tag_utility_lib",
     srcs = ["tag_utility.cc"],
     hdrs = ["tag_utility.h"],

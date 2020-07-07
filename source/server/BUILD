@@ -369,6 +369,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:internal_stats_handler_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/stats:metric_snapshot_impl_lib",
     ],
 )
 
@@ -445,6 +446,7 @@ envoy_cc_library(
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/stats:metric_snapshot_impl_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/server:overload_manager_lib",

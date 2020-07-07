@@ -70,7 +70,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
   std::map<std::string, envoy::config::endpoint::v3::ClusterStats*> metrics_to_cluster_map;
-  std::set<std::string> relevant_metrics;
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
     auto cluster_info_map = cm_.clusters();
@@ -118,44 +117,51 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
             std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
     clusters_[cluster_name] = now;
-    auto metric_name = cluster.info()->loadReportRouterStats().http_upstream_rq_time_.name();
-    relevant_metrics.insert(metric_name);
+
+    ASSERT(cluster.info()->loadReportRouterStats().has_value());
+    auto metric_name = cluster.info()->loadReportRouterStats()->http_upstream_rq_time_.name();
     metrics_to_cluster_map.insert({metric_name, cluster_stats});
   }
 
-  internal_stats_handler_->receiveGlobalStats(
-      relevant_metrics,
-      [&](std::multimap<std::string, const Envoy::Stats::HistogramStatistics&> histogram_stats)
-          -> void {
-        for (auto entry : histogram_stats) {
-          if (metrics_to_cluster_map.find(entry.first) != metrics_to_cluster_map.end()) {
-            auto* cluster_stats = metrics_to_cluster_map[entry.first];
-            auto supported_quantiles = entry.second.supportedQuantiles();
-            auto computed_quantiles = entry.second.computedQuantiles();
-            for (size_t i = 0; i < supported_quantiles.size(); i++) {
-              double val = computed_quantiles[i];
-              if (std::isnan(val)) {
-                val = 0;
-              }
-              auto num = ProtobufWkt::DoubleValue();
-              num.set_value(val);
-              cluster_stats->mutable_request_latency_percentiles()->insert(
-                  Protobuf::MapPair<std::string, ProtobufWkt::DoubleValue>(
-                      std::to_string(supported_quantiles[i]), num));
-            }
+  if (message_->send_request_latency_percentiles()) {
+    internal_stats_handler_->snapshot([this, metrics_to_cluster_map] (Envoy::Stats::MetricSnapshotPtr snapshot) {
+
+      for (const auto &histogram_ref : snapshot->histograms()) {
+        const auto &histogram = histogram_ref.get();
+        auto metric_name = histogram.name();
+        auto it = metrics_to_cluster_map.find(metric_name);
+        if (it != metrics_to_cluster_map.end()) {
+          auto cluster_stats = it->second;
+          auto&& supported_percentiles = cluster_stats->mutable_request_latency_supported_percentiles();
+          auto&& computed_percentiles = cluster_stats->mutable_request_latency_computed_percentiles();
+          auto &interval_stats = histogram.intervalStatistics();
+          for (auto &v : interval_stats.supportedQuantiles()) {
+            supported_percentiles->Add(v);
+          }
+          for (auto &v : interval_stats.computedQuantiles()) {
+            computed_percentiles->Add(std::isnan(v) ? 0 : v);
           }
         }
+      }
 
-        Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
-        ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
-        stream_->sendMessage(request_, false);
-        stats_.responses_.inc();
-        // When the connection is established, the message has not yet been read so we
-        // will not have a load reporting period.
-        if (message_) {
-          startLoadReportPeriod();
-        }
-      });
+      _sendLoadStatsRequest();
+    });
+  }
+  else {
+    _sendLoadStatsRequest();
+  }
+}
+
+void LoadStatsReporter::_sendLoadStatsRequest() {
+  Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
+  ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
+  stream_->sendMessage(request_, false);
+  stats_.responses_.inc();
+  // When the connection is established, the message has not yet been read so we
+  // will not have a load reporting period.
+  if (message_) {
+    startLoadReportPeriod();
+  }
 }
 
 void LoadStatsReporter::handleFailure() {

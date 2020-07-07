@@ -41,6 +41,7 @@
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
+#include "common/stats/metric_snapshot_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/admin/utils.h"
@@ -56,7 +57,8 @@ namespace Server {
 InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
+    HotRestart& restarter, Stats::StoreRoot& store, absl::optional<Stats::StoreRoot>& load_reporting_service_store,
+    Thread::BasicLockable& access_log_lock,
     ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
@@ -65,8 +67,8 @@ InstanceImpl::InstanceImpl(
                                              !options.rejectUnknownDynamicFields(),
                                              options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system,
+      original_start_time_(start_time_), stats_store_(store), load_reporting_service_store_(load_reporting_service_store),
+      thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
@@ -81,7 +83,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_contexts_(*this), internal_stats_handler_(new InternalStatsHandler(store)) {
+      server_contexts_(*this), internal_stats_handler_(new InternalStatsHandler(*load_reporting_service_store)) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -146,40 +148,13 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
-  snapped_counters_ = store.counters();
-  counters_.reserve(snapped_counters_.size());
-  for (const auto& counter : snapped_counters_) {
-    counters_.push_back({counter->latch(), *counter});
-  }
-
-  snapped_gauges_ = store.gauges();
-  gauges_.reserve(snapped_gauges_.size());
-  for (const auto& gauge : snapped_gauges_) {
-    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-    gauges_.push_back(*gauge);
-  }
-
-  snapped_histograms_ = store.histograms();
-  histograms_.reserve(snapped_histograms_.size());
-  for (const auto& histogram : snapped_histograms_) {
-    histograms_.push_back(*histogram);
-  }
-
-  snapped_text_readouts_ = store.textReadouts();
-  text_readouts_.reserve(snapped_text_readouts_.size());
-  for (const auto& text_readout : snapped_text_readouts_) {
-    text_readouts_.push_back(*text_readout);
-  }
-}
-
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Store& store) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store);
+  Stats::MetricSnapshotImpl snapshot(store);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -304,6 +279,14 @@ void InstanceImpl::initialize(const Options& options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
+  bool lrs_enabled = bootstrap_.cluster_manager().has_load_stats_config();
+  if (lrs_enabled) {
+    ASSERT(load_reporting_service_store_.has_value());
+  } else {
+    // TODO(mahmoudhas): Figure out a way to pass nullopt directly if !lrs_enabled
+    load_reporting_service_store_.reset();
+  }
+
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
   // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
   if (!bootstrap_.header_prefix().empty()) {
@@ -322,6 +305,10 @@ void InstanceImpl::initialize(const Options& options,
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  if (lrs_enabled) {
+    load_reporting_service_store_->setTagProducer(Config::Utility::createTagProducer(bootstrap_));
+    load_reporting_service_store_->setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  }
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
@@ -420,6 +407,9 @@ void InstanceImpl::initialize(const Options& options,
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
+  if (lrs_enabled) {
+    load_reporting_service_store_->initializeThreading(*dispatcher_, thread_local_);
+  }
 
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {
@@ -454,7 +444,9 @@ void InstanceImpl::initialize(const Options& options,
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_,
+      load_reporting_service_store_,
+      thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
       *singleton_manager_);

@@ -868,7 +868,7 @@ public:
   /**
    * @return ClusterLoadReportRouterStats& strongly named load report stats for this cluster.
    */
-  virtual ClusterLoadReportRouterStats& loadReportRouterStats() const PURE;
+  virtual absl::optional<ClusterLoadReportRouterStats>& loadReportRouterStats() const PURE;
 
   /**
    * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.
