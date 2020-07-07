@@ -535,6 +535,7 @@ private:
   // on a stack in a non-main thread.
   Server::Instance* server_{};
   Stats::Store* stat_store_{};
+  Stats::Store* load_reporting_service_store_{};
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
   Stats::SymbolTablePtr symbol_table_;
