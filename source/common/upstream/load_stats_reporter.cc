@@ -139,7 +139,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             supported_percentiles->Add(v);
           }
           for (auto &v : interval_stats.computedQuantiles()) {
-            computed_percentiles->Add(std::isnan(v) ? 0 : v);
+            computed_percentiles->Add(v);
           }
         }
       }
