@@ -360,8 +360,6 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
 
-  Stats::StoreOptRef null_load_report_service_store_ = absl::nullopt;
-
   ServerFactoryContextImpl server_contexts_;
   InternalStatsHandlerPtr internal_stats_handler_;
 

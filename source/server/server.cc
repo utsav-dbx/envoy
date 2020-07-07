@@ -440,7 +440,7 @@ void InstanceImpl::initialize(const Options& options,
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_,
-      (load_reporting_service_store_),
+      (lrs_enabled ? load_reporting_service_store_ : Stats::StoreOptRef{}),
       thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
