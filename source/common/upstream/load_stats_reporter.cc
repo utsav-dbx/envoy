@@ -118,8 +118,10 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         }
       }
     }
+    ASSERT(cluster.info()->loadReportStats().has_value());
+
     cluster_stats->set_total_dropped_requests(
-        cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
+        cluster.info()->loadReportStats()->upstream_rq_dropped_.latch());
     const auto now = time_source_.monotonicTime().time_since_epoch();
     const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
@@ -127,8 +129,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
     clusters_[cluster_name] = now;
 
-    ASSERT(cluster.info()->loadReportRouterStats().has_value());
-    auto metric_name = cluster.info()->loadReportRouterStats()->http_upstream_rq_time_.name();
+    auto metric_name = cluster.info()->loadReportStats()->http_upstream_rq_time_.name();
     metrics_to_cluster_map.insert({metric_name, cluster_stats});
   }
 
@@ -237,8 +238,8 @@ void LoadStatsReporter::startLoadReportPeriod() {
     }
     auto& cluster = it->second.get();
 
-    // enable load reporting if not enabled yet
-    if (!cluster.info()->loadReportRouterStats().has_value()) {
+    // initialize load reporting in cluster if uninitialized
+    if (!cluster.info()->loadReportStats().has_value()) {
       cluster.info()->setLoadReportStatsScope(generateStatsScope(cluster_name, *load_stats_reporter_store_root_));
     }
 
@@ -249,7 +250,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
         host->stats().rq_total_.latch();
       }
     }
-    cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
+    cluster.info()->loadReportStats()->upstream_rq_dropped_.latch();
   };
   if (message_->send_all_clusters()) {
     for (const auto& p : cm_.clusters()) {
