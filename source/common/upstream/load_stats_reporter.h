@@ -73,6 +73,7 @@ private:
   std::unordered_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;
   Stats::StoreRootPtr load_stats_reporter_store_root_;
+  bool send_request_latencies_;
 };
 
 using LoadStatsReporterPtr = std::unique_ptr<LoadStatsReporter>;

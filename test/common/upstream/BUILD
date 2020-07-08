@@ -220,6 +220,7 @@ envoy_cc_test(
     tags = ["fails_on_windows"],
     deps = [
         "//source/common/stats:stats_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/upstream:load_stats_reporter_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",

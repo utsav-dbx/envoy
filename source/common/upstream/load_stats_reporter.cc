@@ -37,7 +37,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                  "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
               .getMethodDescriptorForVersion(transport_api_version)),
       time_source_(dispatcher.timeSource()),
-      load_stats_reporter_store_root_(std::move(load_stats_reporter_store_root)) {
+      load_stats_reporter_store_root_(std::move(load_stats_reporter_store_root)), send_request_latencies_{false} {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
@@ -133,7 +133,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     metrics_to_cluster_map.insert({metric_name, cluster_stats});
   }
 
-  if (message_->send_request_latency_percentiles()) {
+  if (send_request_latencies_) {
     // merge histograms and add them to request
     load_stats_reporter_store_root_->mergeHistograms([this, metrics_to_cluster_map] {
       Stats::MetricSnapshotImpl snapshot(*load_stats_reporter_store_root_);
@@ -206,6 +206,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
+  send_request_latencies_ = message_->send_request_latency_percentiles();
   std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
     for (const auto& p : cm_.clusters()) {
