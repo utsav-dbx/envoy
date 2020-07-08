@@ -207,13 +207,12 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
     Stats::ThreadLocalStoreImpl stat_store(*stats_allocator_);
-    Stats::ThreadLocalStoreImpl load_reporting_service_store(*stats_allocator_);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());
     }
     Server::InstanceImpl server(init_manager, options, time_system, local_address, hooks, restarter,
-                                stat_store, load_reporting_service_store, access_log_lock, component_factory,
+                                stat_store, access_log_lock, component_factory,
                                 std::move(random_generator), tls, Thread::threadFactoryForTest(),
                                 Filesystem::fileSystemForTest(), std::move(process_context));
     // This is technically thread unsafe (assigning to a shared_ptr accessed
@@ -222,7 +221,6 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     admin_address_ = server.admin().socket().localAddress();
     server_ = &server;
     stat_store_ = &stat_store;
-    load_reporting_service_store_ = &load_reporting_service_store;
     serverReady();
     server.run();
   }

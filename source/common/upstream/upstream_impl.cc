@@ -1056,16 +1056,6 @@ void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   reloadHealthyHostsHelper(host);
 }
 
-void ClusterImplBase::setLoadReportStatsScope(const Stats::ScopeSharedPtr& scope) {
-  if (!scope) {
-    info_->loadReportRouterStats() = absl::nullopt;
-    load_report_router_stats_scope_ = nullptr;
-    return;
-  }
-  load_report_router_stats_scope_ = scope;
-  info_->loadReportRouterStats().emplace(ClusterInfoImpl::generateLoadReportRouterStats(*scope));
-}
-
 void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
   const auto& host_sets = prioritySet().hostSetsPerPriority();
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
@@ -1101,6 +1091,16 @@ void ClusterImplBase::validateEndpointsForZoneAwareRouting(
     throw EnvoyException(
         fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
   }
+}
+
+void ClusterInfoImpl::setLoadReportStatsScope(Stats::ScopePtr scope) const {
+  if (!scope) {
+    load_report_router_stats_ = absl::nullopt;
+    load_report_stats_scope_ = nullptr;
+    return;
+  }
+  load_report_stats_scope_ = std::move(scope);
+  load_report_router_stats_.emplace(generateLoadReportRouterStats(*scope));
 }
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(

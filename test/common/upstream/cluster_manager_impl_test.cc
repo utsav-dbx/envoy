@@ -42,7 +42,7 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *api_, http_context_, grpc_context_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
-      cluster_manager_->initializeSecondaryClusters(bootstrap, factory_.internal_stats_handler_);
+      cluster_manager_->initializeSecondaryClusters(bootstrap);
     });
   }
 

@@ -206,7 +206,7 @@ public:
    */
   InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-               HotRestart& restarter, Stats::StoreRoot& store, Stats::StoreRoot& load_reporting_service_store,
+               HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
@@ -316,7 +316,7 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
-  Stats::StoreRoot& load_reporting_service_store_;
+  Stats::StoreRootPtr load_reporting_service_store_;
   std::unique_ptr<ServerStats> server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
@@ -361,7 +361,6 @@ private:
   Stats::TimespanPtr initialization_timer_;
 
   ServerFactoryContextImpl server_contexts_;
-  InternalStatsHandlerPtr internal_stats_handler_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

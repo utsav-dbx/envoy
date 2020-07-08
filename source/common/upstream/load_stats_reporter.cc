@@ -5,22 +5,30 @@
 #include <map>
 #include <set>
 
-#include "envoy/server/internal_stats_handler.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/version_converter.h"
+#include "common/stats/metric_snapshot_impl.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+
+Stats::ScopePtr generateStatsScope(std::string cluster_name, Stats::Store& stats) {
+  return stats.createScope(fmt::format("cluster.{}.", cluster_name));
+}
+
+} // namespace
 
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
                                      envoy::config::core::v3::ApiVersion transport_api_version,
                                      Event::Dispatcher& dispatcher,
-                                     const Server::InternalStatsHandlerPtr& internal_stats_handler)
+                                     Stats::StoreRootPtr load_stats_reporter_store_root)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
@@ -28,7 +36,8 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
           Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
                                  "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
               .getMethodDescriptorForVersion(transport_api_version)),
-      time_source_(dispatcher.timeSource()), internal_stats_handler_(internal_stats_handler) {
+      time_source_(dispatcher.timeSource()),
+      load_stats_reporter_store_root_(std::move(load_stats_reporter_store_root)) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
@@ -124,9 +133,11 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   }
 
   if (message_->send_request_latency_percentiles()) {
-    internal_stats_handler_->snapshot([this, metrics_to_cluster_map] (Envoy::Stats::MetricSnapshotPtr snapshot) {
+    // merge histograms and add them to request
+    load_stats_reporter_store_root_->mergeHistograms([this, metrics_to_cluster_map] {
+      Stats::MetricSnapshotImpl snapshot(*load_stats_reporter_store_root_);
 
-      for (const auto &histogram_ref : snapshot->histograms()) {
+      for (const auto &histogram_ref : snapshot.histograms()) {
         const auto &histogram = histogram_ref.get();
         auto metric_name = histogram.name();
         auto it = metrics_to_cluster_map.find(metric_name);
@@ -225,6 +236,12 @@ void LoadStatsReporter::startLoadReportPeriod() {
       return;
     }
     auto& cluster = it->second.get();
+
+    // enable load reporting if not enabled yet
+    if (!cluster.info()->loadReportRouterStats().has_value()) {
+      cluster.info()->setLoadReportStatsScope(generateStatsScope(cluster_name, *load_stats_reporter_store_root_));
+    }
+
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (const auto& host : host_set->hosts()) {
         host->stats().rq_success_.latch();

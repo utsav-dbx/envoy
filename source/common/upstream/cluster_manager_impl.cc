@@ -30,6 +30,7 @@
 #include "common/http/http2/conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/thread_local_store.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/original_conn_pool.h"
@@ -240,8 +241,9 @@ ClusterManagerImpl::ClusterManagerImpl(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context)
-    : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
+    : factory_(factory), runtime_(runtime), stats_(stats), stats_allocator_(stats_.symbolTable()),
+      main_thread_local_(tls), tls_(tls.allocateSlot()), random_(random),
+      bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
@@ -391,20 +393,22 @@ ClusterManagerImpl::ClusterManagerImpl(
 }
 
 void ClusterManagerImpl::initializeSecondaryClusters(
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-    const Server::InternalStatsHandlerPtr& internal_stats_handler) {
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   init_helper_.startInitializingSecondaryClusters();
 
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
 
+    auto load_stats_reporter_store_root = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
+    load_stats_reporter_store_root->initializeThreading(dispatcher_, main_thread_local_);
+
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, stats_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), dispatcher_, internal_stats_handler);
+        load_stats_config.transport_api_version(), dispatcher_, std::move(load_stats_reporter_store_root));
   }
 }
 
@@ -1424,7 +1428,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, load_report_service_store_,
+      cluster, cm, stats_,
       tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
       outlier_event_logger, added_via_api,

@@ -579,6 +579,7 @@ public:
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
+  void setLoadReportStatsScope(Stats::ScopePtr) const override;
   absl::optional<ClusterLoadReportRouterStats>& loadReportRouterStats() const override {
     return load_report_router_stats_;
   }
@@ -639,6 +640,7 @@ private:
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
+  mutable Stats::ScopePtr load_report_stats_scope_;
   mutable absl::optional<ClusterLoadReportRouterStats> load_report_router_stats_;
   const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   const uint64_t features_;
@@ -704,11 +706,6 @@ public:
    * documented in setHealthChecker().
    */
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
-
-  /**
-   * Optionally set a scope for load reporting service.
-   */
-  void setLoadReportStatsScope(const Stats::ScopeSharedPtr& scope);
 
   /**
    * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
@@ -799,7 +796,6 @@ private:
   const bool local_cluster_;
   Stats::SymbolTable& symbol_table_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
-  Stats::ScopeSharedPtr load_report_router_stats_scope_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

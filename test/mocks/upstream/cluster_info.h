@@ -119,6 +119,7 @@ public:
   MOCK_METHOD(ClusterStats&, stats, (), (const));
   MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
+  MOCK_METHOD(void, setLoadReportStatsScope, (Stats::ScopePtr), (const));
   MOCK_METHOD(absl::optional<ClusterLoadReportRouterStats>&, loadReportRouterStats, (), (const));
   MOCK_METHOD(absl::optional<ClusterTimeoutBudgetStats>&, timeoutBudgetStats, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));

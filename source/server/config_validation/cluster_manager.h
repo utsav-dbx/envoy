@@ -30,7 +30,7 @@ public:
       Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
       Event::TimeSystem& time_system)
-      : ProdClusterManagerFactory(admin, runtime, stats, absl::nullopt, tls, random, dns_resolver,
+      : ProdClusterManagerFactory(admin, runtime, stats, tls, random, dns_resolver,
                                   ssl_context_manager, main_thread_dispatcher, local_info,
                                   secret_manager, validation_context, api, http_context,
                                   grpc_context, log_manager, singleton_manager),

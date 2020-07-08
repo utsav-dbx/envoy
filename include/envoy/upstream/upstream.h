@@ -866,6 +866,11 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
+   * Sets the scope for load report stats. If scope is set to nullptr, load reporting is turned off.
+   */
+  virtual void setLoadReportStatsScope(Stats::ScopePtr scope) const PURE;
+
+  /**
    * @return ClusterLoadReportRouterStats& strongly named load report stats for this cluster.
    */
   virtual absl::optional<ClusterLoadReportRouterStats>& loadReportRouterStats() const PURE;

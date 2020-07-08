@@ -77,12 +77,10 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     std::set_new_handler([]() { PANIC("out of memory"); });
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
-    load_reporting_service_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = std::make_unique<Server::InstanceImpl>(
         *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
-        *stats_store_, *load_reporting_service_store_,
-        access_log_lock, component_factory, std::move(random_generator), *tls_,
+        *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
         thread_factory_, file_system_, std::move(process_context));
 
     break;

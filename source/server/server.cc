@@ -19,7 +19,6 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
-#include "envoy/server/internal_stats_handler.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -57,8 +56,7 @@ namespace Server {
 InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-    HotRestart& restarter, Stats::StoreRoot& store, Stats::StoreRoot& load_reporting_service_store,
-    Thread::BasicLockable& access_log_lock,
+    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
     ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
@@ -67,7 +65,7 @@ InstanceImpl::InstanceImpl(
                                              !options.rejectUnknownDynamicFields(),
                                              options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), load_reporting_service_store_(load_reporting_service_store),
+      original_start_time_(start_time_), stats_store_(store), load_reporting_service_store_(nullptr),
       thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
@@ -83,7 +81,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_contexts_(*this), internal_stats_handler_(new InternalStatsHandler(load_reporting_service_store)) {
+      server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -279,9 +277,6 @@ void InstanceImpl::initialize(const Options& options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
-  // TODO(mahmoudhas): Figure out a way to pass nullopt to load_report_stats_store directly if !lrs_enabled
-  bool lrs_enabled = bootstrap_.cluster_manager().has_load_stats_config();
-
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
   // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
   if (!bootstrap_.header_prefix().empty()) {
@@ -300,10 +295,6 @@ void InstanceImpl::initialize(const Options& options,
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
-  if (lrs_enabled) {
-    load_reporting_service_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
-    load_reporting_service_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
-  }
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
@@ -402,9 +393,6 @@ void InstanceImpl::initialize(const Options& options,
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
-  if (lrs_enabled) {
-    load_reporting_service_store_.initializeThreading(*dispatcher_, thread_local_);
-  }
 
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {
@@ -439,9 +427,7 @@ void InstanceImpl::initialize(const Options& options,
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_,
-      (lrs_enabled ? load_reporting_service_store_ : Stats::StoreOptRef{}),
-      thread_local_, *random_generator_,
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
       *singleton_manager_);
@@ -497,7 +483,7 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
 
-  clusterManager().initializeSecondaryClusters(bootstrap_, internal_stats_handler_);
+  clusterManager().initializeSecondaryClusters(bootstrap_);
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();

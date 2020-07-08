@@ -40,7 +40,7 @@ namespace Upstream {
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(
-      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats, Stats::StoreOptRef load_report_service_store,
+      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
       ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
       Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
@@ -49,7 +49,7 @@ public:
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
         api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
-        runtime_(runtime), stats_(stats), load_report_service_store_(load_report_service_store), tls_(tls), random_(random), dns_resolver_(dns_resolver),
+        runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager) {}
@@ -82,7 +82,6 @@ protected:
   Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
-  Stats::StoreOptRef load_report_service_store_;
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -261,8 +260,7 @@ public:
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
 
   void initializeSecondaryClusters(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-      const Server::InternalStatsHandlerPtr& internal_stats_handler) override;
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
@@ -481,6 +479,8 @@ private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
+  Stats::AllocatorImpl stats_allocator_;
+  ThreadLocal::Instance& main_thread_local_;
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
 
