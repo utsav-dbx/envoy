@@ -58,6 +58,8 @@ private:
 
   void _sendLoadStatsRequest();
 
+  std::set<ClusterInfoConstSharedPtr> enabled_clusters_;
+
   ClusterManager& cm_;
   LoadReporterStats stats_;
   Grpc::AsyncClient<envoy::service::load_stats::v3::LoadStatsRequest,

@@ -47,6 +47,9 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
 
 LoadStatsReporter::~LoadStatsReporter() {
   load_stats_reporter_store_root_->shutdownThreading();
+  for (auto &i : enabled_clusters_) {
+    i->setLoadReportStatsScope(nullptr);
+  }
 }
 
 void LoadStatsReporter::setRetryTimer() {
@@ -245,6 +248,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
 
     // initialize load reporting in cluster if uninitialized
     if (!cluster.info()->loadReportStats().has_value()) {
+      enabled_clusters_.insert(cluster.info());
       cluster.info()->setLoadReportStatsScope(generateStatsScope(cluster_name, *load_stats_reporter_store_root_));
     }
 

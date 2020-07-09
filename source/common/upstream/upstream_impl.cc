@@ -679,7 +679,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)),
-      load_report_stats_(absl::nullopt),
+      load_report_stats_scope_(nullptr), load_report_stats_(absl::nullopt),
       timeout_budget_stats_(config.track_timeout_budgets()
                                 ? absl::make_optional<ClusterTimeoutBudgetStats>(
                                       generateTimeoutBudgetStats(*stats_scope_))
