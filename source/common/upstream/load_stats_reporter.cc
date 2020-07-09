@@ -84,8 +84,9 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // One possible way to deal with this would be to get a notification whenever a new cluster is
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
+
   request_.mutable_cluster_stats()->Clear();
-  std::map<std::string, envoy::config::endpoint::v3::ClusterStats*> metrics_to_cluster_map;
+  std::map<std::string, envoy::config::endpoint::v3::ClusterStats*> latency_metrics_to_cluster;
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
     auto cluster_info_map = cm_.clusters();
@@ -136,37 +137,30 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
     clusters_[cluster_name] = now;
 
-    auto metric_name = cluster.info()->loadReportStats()->http_upstream_rq_time_.name();
-    metrics_to_cluster_map.insert({metric_name, cluster_stats});
+    auto latency_metric_name = cluster.info()->loadReportStats()->http_upstream_rq_time_.name();
+    latency_metrics_to_cluster[latency_metric_name] = cluster_stats;
   }
 
   if (send_request_latencies_) {
-    // merge histograms and add them to request
-    load_stats_reporter_store_root_->mergeHistograms([this, metrics_to_cluster_map] {
-      Stats::MetricSnapshotImpl snapshot(*load_stats_reporter_store_root_);
-
-      for (const auto &histogram_ref : snapshot.histograms()) {
-        const auto &histogram = histogram_ref.get();
-        auto metric_name = histogram.name();
-        auto it = metrics_to_cluster_map.find(metric_name);
-        if (it != metrics_to_cluster_map.end()) {
+    load_stats_reporter_store_root_->mergeHistograms([this, latency_metrics_to_cluster] {
+      for (const auto &histogram : load_stats_reporter_store_root_->histograms()) {
+        auto metric_name = histogram->name();
+        auto it = latency_metrics_to_cluster.find(metric_name);
+        if (it != latency_metrics_to_cluster.end()) {
           auto cluster_stats = it->second;
-          auto&& supported_percentiles = cluster_stats->mutable_request_latency_supported_percentiles();
-          auto&& computed_percentiles = cluster_stats->mutable_request_latency_computed_percentiles();
-          auto &interval_stats = histogram.intervalStatistics();
+          auto &interval_stats = histogram->intervalStatistics();
           for (auto &v : interval_stats.supportedQuantiles()) {
-            supported_percentiles->Add(v);
+            cluster_stats->add_request_latency_supported_percentiles(v);
           }
           for (auto &v : interval_stats.computedQuantiles()) {
-            computed_percentiles->Add(v);
+            cluster_stats->add_request_latency_computed_percentiles(v);
           }
         }
       }
 
       _sendLoadStatsRequest();
     });
-  }
-  else {
+  } else {
     _sendLoadStatsRequest();
   }
 }

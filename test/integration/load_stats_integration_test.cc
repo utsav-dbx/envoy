@@ -280,11 +280,13 @@ public:
         EXPECT_LT(actual_load_report_interval_ms, load_report_interval_ms_ + 1000);
         cluster_stats.mutable_load_report_interval()->Clear();
 
-        // sanity check request latencies aren't NAN
-        for (auto &p : cluster_stats.request_latency_computed_percentiles()) {
-          EXPECT_THAT(std::isnan(p), false);
-        }
+        // sanity check there are reported latencies
+        EXPECT_TRUE(cluster_stats.request_latency_computed_percentiles().size() > 0);
+        EXPECT_TRUE(cluster_stats.request_latency_computed_percentiles().size() == 
+                    cluster_stats.request_latency_supported_percentiles().size());
+
         cluster_stats.mutable_request_latency_computed_percentiles()->Clear();
+        cluster_stats.mutable_request_latency_supported_percentiles()->Clear();
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
@@ -321,7 +323,7 @@ public:
   }
 
   void requestLoadStatsResponse(const std::vector<std::string>& clusters,
-                                bool send_all_clusters = false) {
+                                bool send_all_clusters = false, bool send_latencies = true) {
     envoy::service::load_stats::v3::LoadStatsResponse loadstats_response;
     loadstats_response.mutable_load_reporting_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(load_report_interval_ms_));
@@ -330,6 +332,9 @@ public:
     }
     if (send_all_clusters) {
       loadstats_response.set_send_all_clusters(true);
+    }
+    if (send_latencies) {
+      loadstats_response.set_send_request_latency_percentiles(true);
     }
     loadstats_stream_->sendGrpcMessage(loadstats_response);
     // Wait until the request has been received by Envoy.
