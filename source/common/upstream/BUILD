@@ -67,6 +67,7 @@ envoy_cc_library(
         "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
+        "//source/common/stats:thread_local_store_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -192,11 +193,11 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/stats:metric_snapshot_impl_lib",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:async_client_lib",
-        "//source/server:internal_stats_handler_lib",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
     ],
 )

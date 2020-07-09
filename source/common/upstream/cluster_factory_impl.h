@@ -51,7 +51,7 @@ namespace Upstream {
 class ClusterFactoryContextImpl : public ClusterFactoryContext {
 
 public:
-  ClusterFactoryContextImpl(ClusterManager& cluster_manager, Stats::Store& stats,
+  ClusterFactoryContextImpl(ClusterManager& cluster_manager, Stats::Store& stats, Stats::StoreRoot& load_reporting_service_store,
                             ThreadLocal::SlotAllocator& tls,
                             Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
@@ -61,7 +61,7 @@ public:
                             Singleton::Manager& singleton_manager,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-      : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
+      : cluster_manager_(cluster_manager), stats_(stats), load_reporting_service_store_(load_reporting_service_store), tls_(tls),
         dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
         runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
         local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
@@ -69,6 +69,7 @@ public:
         validation_visitor_(validation_visitor), api_(api) {}
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
+  Stats::StoreRoot& loadReportingServiceStore() override { return load_reporting_service_store_; }
   Stats::Store& stats() override { return stats_; }
   ThreadLocal::SlotAllocator& tls() override { return tls_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
@@ -90,6 +91,7 @@ public:
 private:
   ClusterManager& cluster_manager_;
   Stats::Store& stats_;
+  Stats::StoreRoot& load_reporting_service_store_;
   ThreadLocal::SlotAllocator& tls_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
@@ -118,7 +120,7 @@ public:
    */
   static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   create(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-         Stats::Store& stats, ThreadLocal::Instance& tls,
+         Stats::Store& stats, Stats::StoreRoot& load_reporting_service_store, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
          Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,

@@ -28,7 +28,8 @@ static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
 HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
                          envoy::config::core::v3::ApiVersion transport_api_version,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                         Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                         Envoy::Stats::Store& stats,
+                         Envoy::Stats::StoreRoot& load_reporting_service_store, Ssl::ContextManager& ssl_context_manager,
                          Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
@@ -40,7 +41,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")
                           .getMethodDescriptorForVersion(transport_api_version)),
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
-      dispatcher_(dispatcher), runtime_(runtime), store_stats_(stats),
+      dispatcher_(dispatcher), runtime_(runtime), store_stats_(stats), load_reporting_service_store_(load_reporting_service_store),
       ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
       singleton_manager_(singleton_manager), tls_(tls), validation_visitor_(validation_visitor),
@@ -173,7 +174,7 @@ void HdsDelegate::processMessage(
 
     // Create HdsCluster
     hds_clusters_.emplace_back(new HdsCluster(admin_, runtime_, cluster_config, bind_config,
-                                              store_stats_, ssl_context_manager_, false,
+                                              store_stats_, load_reporting_service_store_, ssl_context_manager_, false,
                                               info_factory_, cm_, local_info_, dispatcher_, random_,
                                               singleton_manager_, tls_, validation_visitor_, api_));
 
@@ -218,21 +219,23 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
 
 HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        const envoy::config::cluster::v3::Cluster& cluster,
-                       const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
+                       const envoy::config::core::v3::BindConfig& bind_config,
+                       Stats::Store& stats,
+                       Stats::StoreRoot& load_reporting_service_store,
                        Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
                        ThreadLocal::SlotAllocator& tls,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats),
+    : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats), load_reporting_service_store_(load_reporting_service_store),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       initial_hosts_(new HostVector()), validation_visitor_(validation_visitor) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
   info_ = info_factory.createClusterInfo(
-      {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
+      {admin, runtime_, cluster_, bind_config_, stats_, load_reporting_service_store_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
   for (const auto& host : cluster.load_assignment().endpoints(0).lb_endpoints()) {
@@ -265,7 +268,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
   return std::make_unique<ClusterInfoImpl>(
       params.cluster_, params.bind_config_, params.runtime_, std::move(socket_matcher),
-      std::move(scope), params.added_via_api_, params.validation_visitor_, factory_context);
+      std::move(scope), params.load_reporting_service_store_, params.added_via_api_, params.validation_visitor_, factory_context);
 }
 
 void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,

@@ -212,7 +212,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());
     }
     Server::InstanceImpl server(init_manager, options, time_system, local_address, hooks, restarter,
-                                stat_store, access_log_lock, component_factory,
+                                stat_store, *stats_allocator_, access_log_lock, component_factory,
                                 std::move(random_generator), tls, Thread::threadFactoryForTest(),
                                 Filesystem::fileSystemForTest(), std::move(process_context));
     // This is technically thread unsafe (assigning to a shared_ptr accessed

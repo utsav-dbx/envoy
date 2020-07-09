@@ -696,8 +696,6 @@ public:
   MOCK_METHOD(std::string, name, (), (const, override));
 };
 
-class MockInternalStatsHandler : public InternalStatsHandler {};
-
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

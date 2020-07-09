@@ -104,6 +104,11 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
+   * FIXME(utsav) docs
+   */
+  virtual Stats::StoreRoot& loadReportingServiceStore() PURE;
+
+  /**
    * @return the server's TLS slot allocator.
    */
   virtual ThreadLocal::SlotAllocator& tls() PURE;

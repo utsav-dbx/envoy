@@ -42,6 +42,8 @@ public:
   virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
 };
 
+using MetricSnapshotPtr = std::unique_ptr<MetricSnapshot>;
+
 /**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
  */

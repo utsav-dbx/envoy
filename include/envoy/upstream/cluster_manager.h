@@ -21,7 +21,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
-#include "envoy/server/internal_stats_handler.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
@@ -121,8 +120,7 @@ public:
    * dynamically provisioned clusters have finished initializing.
    */
   virtual void
-  initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                              const Server::InternalStatsHandlerPtr& internal_stats_handler) PURE;
+  initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Stats::StoreRoot& load_reporting_service_store) PURE;
 
   using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
 
@@ -362,6 +360,7 @@ public:
     const envoy::config::cluster::v3::Cluster& cluster_;
     const envoy::config::core::v3::BindConfig& bind_config_;
     Stats::Store& stats_;
+    Stats::StoreRoot& load_reporting_service_store_;
     Ssl::ContextManager& ssl_context_manager_;
     const bool added_via_api_;
     ClusterManager& cm_;

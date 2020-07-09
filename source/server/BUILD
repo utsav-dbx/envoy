@@ -364,15 +364,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "internal_stats_handler_lib",
-    srcs = ["internal_stats_handler.cc"],
-    deps = [
-        "//include/envoy/server:internal_stats_handler_interface",
-        "//include/envoy/stats:stats_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "proto_descriptors_lib",
     srcs = ["proto_descriptors.cc"],
     hdrs = ["proto_descriptors.h"],
@@ -404,7 +395,6 @@ envoy_cc_library(
         ":configuration_lib",
         ":connection_handler_lib",
         ":guarddog_lib",
-        ":internal_stats_handler_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
         ":ssl_context_manager_lib",
@@ -445,6 +435,7 @@ envoy_cc_library(
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/stats:metric_snapshot_impl_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/server:overload_manager_lib",

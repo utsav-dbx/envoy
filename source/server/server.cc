@@ -19,7 +19,6 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
-#include "envoy/server/internal_stats_handler.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -41,6 +40,7 @@
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
+#include "common/stats/metric_snapshot_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/admin/utils.h"
@@ -56,8 +56,8 @@ namespace Server {
 InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    HotRestart& restarter, Stats::StoreRoot& store, Stats::AllocatorImpl& allocator,
+    Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
@@ -65,8 +65,9 @@ InstanceImpl::InstanceImpl(
                                              !options.rejectUnknownDynamicFields(),
                                              options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system,
+      original_start_time_(start_time_), stats_store_(store), allocator_(allocator),
+      load_reporting_service_store_(*std::make_unique<Stats::ThreadLocalStoreImpl>(allocator_)),
+      thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
@@ -81,7 +82,8 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_contexts_(*this), internal_stats_handler_(new InternalStatsHandler(store)) {
+      server_contexts_(*this) {
+
   try {
     if (!options.logPath().empty()) {
       try {
@@ -146,40 +148,13 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
-  snapped_counters_ = store.counters();
-  counters_.reserve(snapped_counters_.size());
-  for (const auto& counter : snapped_counters_) {
-    counters_.push_back({counter->latch(), *counter});
-  }
-
-  snapped_gauges_ = store.gauges();
-  gauges_.reserve(snapped_gauges_.size());
-  for (const auto& gauge : snapped_gauges_) {
-    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-    gauges_.push_back(*gauge);
-  }
-
-  snapped_histograms_ = store.histograms();
-  histograms_.reserve(snapped_histograms_.size());
-  for (const auto& histogram : snapped_histograms_) {
-    histograms_.push_back(*histogram);
-  }
-
-  snapped_text_readouts_ = store.textReadouts();
-  text_readouts_.reserve(snapped_text_readouts_.size());
-  for (const auto& text_readout : snapped_text_readouts_) {
-    text_readouts_.push_back(*text_readout);
-  }
-}
-
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Store& store) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store);
+  Stats::MetricSnapshotImpl snapshot(store);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -453,8 +428,13 @@ void InstanceImpl::initialize(const Options& options,
   const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
+  // FIXME(utsav): docs
+  if (bootstrap_.cluster_manager().has_load_stats_config()) {
+    load_reporting_service_store_.initializeThreading(*dispatcher_, thread_local_);
+  }
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_, load_reporting_service_store_, thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
       *singleton_manager_);
@@ -510,7 +490,7 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
 
-  clusterManager().initializeSecondaryClusters(bootstrap_, internal_stats_handler_);
+  clusterManager().initializeSecondaryClusters(bootstrap_, load_reporting_service_store_);
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
@@ -522,7 +502,7 @@ void InstanceImpl::onRuntimeReady() {
                                                        stats_store_, false)
             ->create(),
         hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        stats_store_, load_reporting_service_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }

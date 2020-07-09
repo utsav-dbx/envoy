@@ -281,11 +281,10 @@ public:
         cluster_stats.mutable_load_report_interval()->Clear();
 
         // sanity check request latencies aren't NAN
-        auto percentiles = cluster_stats.mutable_request_latency_percentiles();
-        for (auto iterator = percentiles->begin(); iterator != percentiles->end(); iterator++) {
-          EXPECT_THAT(std::isnan(iterator->second.value()), false);
+        for (auto &p : cluster_stats.request_latency_computed_percentiles()) {
+          EXPECT_THAT(std::isnan(p), false);
         }
-        cluster_stats.mutable_request_latency_percentiles()->clear();
+        cluster_stats.mutable_request_latency_computed_percentiles()->Clear();
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
