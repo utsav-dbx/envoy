@@ -1094,8 +1094,8 @@ void ClusterInfoImpl::setLoadReportStatsScope(Stats::ScopePtr scope) const {
     load_report_stats_scope_ = nullptr;
     return;
   }
-  load_report_stats_scope_ = std::move(scope);
   load_report_stats_.emplace(generateLoadReportStats(*scope));
+  load_report_stats_scope_ = std::move(scope);
 }
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(

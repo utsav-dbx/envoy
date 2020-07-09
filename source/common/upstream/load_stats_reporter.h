@@ -36,6 +36,7 @@ public:
                     envoy::config::core::v3::ApiVersion transport_api_version,
                     Event::Dispatcher& dispatcher,
                     Stats::StoreRootPtr load_stats_reporter_store_root);
+  ~LoadStatsReporter();
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;

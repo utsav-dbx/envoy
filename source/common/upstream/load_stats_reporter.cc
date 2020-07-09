@@ -45,6 +45,10 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
   establishNewStream();
 }
 
+LoadStatsReporter::~LoadStatsReporter() {
+  load_stats_reporter_store_root_->shutdownThreading();
+}
+
 void LoadStatsReporter::setRetryTimer() {
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
