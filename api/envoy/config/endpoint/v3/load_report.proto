@@ -161,10 +161,9 @@ message ClusterStats {
   repeated DroppedRequests dropped_requests = 5;
 
   // the request latencies in this cluster. Only HTTP requests are currently
-  // supported. It is guaranteed that len(request_latency_supported_pecentiles)
-  // == len(request_latency_computed_percentiles).
+  // supported.
+  // Guaranteed that len(request_latency_supported_percentiles) == len(request_latency_computed_percentiles)
   repeated double request_latency_supported_percentiles = 7;
-
   repeated double request_latency_computed_percentiles = 8;
 
   // Period over which the actual load report occurred. This will be guaranteed to include every
