@@ -50,6 +50,7 @@ public:
 };
 
 using StorePtr = std::unique_ptr<Store>;
+using StoreOptRef = absl::optional<std::reference_wrapper<Store>>;
 
 /**
  * Callback invoked when a store's mergeHistogram() runs.

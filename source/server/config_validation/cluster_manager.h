@@ -23,6 +23,7 @@ public:
 
   explicit ValidationClusterManagerFactory(
       Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+      Stats::StoreRootPtr& load_report_stats_store,
       ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
       Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
@@ -30,7 +31,7 @@ public:
       Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
       Event::TimeSystem& time_system)
-      : ProdClusterManagerFactory(admin, runtime, stats, tls, random, dns_resolver,
+      : ProdClusterManagerFactory(admin, runtime, stats, load_report_stats_store, tls, random, dns_resolver,
                                   ssl_context_manager, main_thread_dispatcher, local_info,
                                   secret_manager, validation_context, api, http_context,
                                   grpc_context, log_manager, singleton_manager),
@@ -56,6 +57,7 @@ class ValidationClusterManager : public ClusterManagerImpl {
 public:
   ValidationClusterManager(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
+                           Stats::StoreRootPtr& load_stats_store_root,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,

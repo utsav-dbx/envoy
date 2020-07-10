@@ -25,7 +25,8 @@ Stats::ScopePtr generateStatsScope(const envoy::config::cluster::v3::Cluster& co
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-    Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+    Stats::Store& stats, Stats::StoreRootPtr& load_report_stats_store,
+    ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
@@ -73,9 +74,9 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
   }
 
   ClusterFactoryContextImpl context(
-      cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime, random,
-      dispatcher, log_manager, local_info, admin, singleton_manager,
-      std::move(outlier_event_logger), added_via_api, validation_visitor, api);
+      cluster_manager, stats, load_report_stats_store, tls, std::move(dns_resolver),
+      ssl_context_manager, runtime, random, dispatcher, log_manager, local_info, admin,
+      singleton_manager, std::move(outlier_event_logger), added_via_api, validation_visitor, api);
   return factory->create(cluster, context);
 }
 
@@ -129,6 +130,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
       *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
       context.outlierEventLogger()));
+
   return new_cluster_pair;
 }
 

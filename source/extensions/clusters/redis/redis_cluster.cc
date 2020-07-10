@@ -22,9 +22,12 @@ RedisCluster::RedisCluster(
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api,
+    Stats::ScopePtr&& stats_scope,
+    Stats::StoreRootPtr& load_reporter_stats_store,
+    bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
+                                       load_reporter_stats_store,
                                        added_via_api),
       cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
@@ -383,7 +386,7 @@ RedisClusterFactory::createClusterWithConfig(
                               NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
                               context.clusterManager(), context.runtime(), context.api(),
                               selectDnsResolver(cluster, context), socket_factory_context,
-                              std::move(stats_scope), context.addedViaApi(), nullptr),
+                              std::move(stats_scope), context.loadReportingStatsStore(), context.addedViaApi(), nullptr),
                           nullptr);
   }
   auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>(context.random());
@@ -392,7 +395,7 @@ RedisClusterFactory::createClusterWithConfig(
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
                             context.clusterManager(), context.runtime(), context.api(),
                             selectDnsResolver(cluster, context), socket_factory_context,
-                            std::move(stats_scope), context.addedViaApi(), lb_factory),
+                            std::move(stats_scope), context.loadReportingStatsStore(), context.addedViaApi(), lb_factory),
                         std::make_unique<RedisClusterThreadAwareLoadBalancer>(lb_factory));
 }
 
